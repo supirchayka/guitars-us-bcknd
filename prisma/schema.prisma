@@ -1,0 +1,153 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomGuitarStatus {
+  DRAFT
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SHIPPED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  CANCELLED
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
+  password     String
+  role         UserRole   @default(ADMIN)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  refreshToken String?
+}
+
+model Guitar {
+  id              Int                   @id @default(autoincrement())
+  name            String
+  description     String?
+  price           Decimal               @db.Decimal(10, 2)
+  stock           Int                   @default(0)
+  images          GuitarImage[]
+  characteristics GuitarCharacteristic[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  orderItems      OrderItem[]
+}
+
+model GuitarImage {
+  id        Int    @id @default(autoincrement())
+  url       String
+  guitarId  Int
+  guitar    Guitar @relation(fields: [guitarId], references: [id])
+}
+
+model CharacteristicType {
+  id              Int                     @id @default(autoincrement())
+  name            String                  @unique
+  options         CharacteristicOption[]
+}
+
+model CharacteristicOption {
+  id                  Int                    @id @default(autoincrement())
+  value               String
+  typeId              Int
+  type                CharacteristicType     @relation(fields: [typeId], references: [id])
+  guitarCharacteristics GuitarCharacteristic[]
+  customOptions       CustomGuitarOption[]
+}
+
+model GuitarCharacteristic {
+  id        Int                   @id @default(autoincrement())
+  guitarId  Int
+  optionId  Int
+  guitar    Guitar                @relation(fields: [guitarId], references: [id])
+  option    CharacteristicOption @relation(fields: [optionId], references: [id])
+}
+
+model Order {
+  id             Int        @id @default(autoincrement())
+  customerEmail  String
+  totalAmount    Decimal    @db.Decimal(10, 2)
+  status         OrderStatus @default(PENDING)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  items          OrderItem[]
+  promoCodeId    Int?
+  promoCode      PromoCode? @relation(fields: [promoCodeId], references: [id])
+  shopifyOrderId String?
+  paypalOrderId  String?
+  customGuitars  CustomGuitar[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  guitarId  Int
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  order     Order   @relation(fields: [orderId], references: [id])
+  guitar    Guitar  @relation(fields: [guitarId], references: [id])
+}
+
+model PromoCode {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  description String?
+  discount    Float
+  active      Boolean  @default(true)
+  blogger     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orders      Order[]
+}
+
+model CustomGuitar {
+  id               Int                 @id @default(autoincrement())
+  customerEmail    String
+  customerName     String?
+  customerPhone    String?
+  price            Decimal             @db.Decimal(10, 2)
+  status           CustomGuitarStatus  @default(DRAFT)
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  selectedOptions  CustomGuitarOption[]
+  orderId          Int?
+  order            Order?              @relation(fields: [orderId], references: [id])
+  
+  @@index([customerEmail])
+}
+
+model CustomGuitarOption {
+  id             Int               @id @default(autoincrement())
+  customGuitarId Int
+  optionId       Int
+  customGuitar   CustomGuitar      @relation(fields: [customGuitarId], references: [id])
+  option         CharacteristicOption @relation(fields: [optionId], references: [id])
+  
+  @@index([customGuitarId, optionId])
+}
